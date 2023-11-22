@@ -1,9 +1,13 @@
 import numpy as np
+print('imported numpy')
 import mayavi.mlab as mlab
+print('imported mayavi')
+import matplotlib as maplli
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
 import mesh_utils
+maplli.use("Qt5Agg")
 
 def plot_mesh(mesh, cam_trafo=np.eye(4), mesh_pose=np.eye(4)):
     """
