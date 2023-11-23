@@ -79,6 +79,7 @@ RUN rosdep init && \
 
 RUN apt-get update && apt-get install --no-install-recommends -y --allow-unauthenticated \
      python3-catkin-tools \
+     ros-melodic-realsense2-camera \
      && rm -rf /var/lib/apt/lists/*
 
 RUN python -m pip install --upgrade setuptools opencv-contrib-python

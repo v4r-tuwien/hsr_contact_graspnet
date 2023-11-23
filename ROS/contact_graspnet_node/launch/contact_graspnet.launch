@@ -1,0 +1,10 @@
+<launch>
+  <node name="contact_graspnet" pkg="contact_graspnet_node" type="contact_graspnet_node.py" output="screen">    
+    <param name="checkpoint_path" value="/contact_graspnet/checkpoints/" />
+    <param name="rgb_topic" value="/camera/rgb/image_raw" />
+    <param name="dep_topic" value="/camera/depth/image_rect" />
+    <param name="camera_info_topic" value="/camera/color/camera_info" />
+    <param name="service_call" value="/contact_graspnet/return_grasp_point" />
+    <param name="node_type" value="continuous" type="string" />
+  </node>
+</launch>
