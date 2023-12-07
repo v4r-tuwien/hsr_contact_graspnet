@@ -1,13 +1,12 @@
 import numpy as np
-print('imported numpy')
 import mayavi.mlab as mlab
-print('imported mayavi')
 import matplotlib as maplli
 import matplotlib.pyplot as plt
 from matplotlib import cm
 
 import mesh_utils
-maplli.use("Qt5Agg")
+#maplli.use("Qt5Agg")
+maplli.use("agg")
 
 def plot_mesh(mesh, cam_trafo=np.eye(4), mesh_pose=np.eye(4)):
     """
@@ -108,6 +107,49 @@ def visualize_grasps(full_pc, pred_grasps_cam, scores, plot_opencv_cam=False, pc
                 colors3 = [cm2(0.5*score)[:3] for score in scores[k]]
                 draw_grasps(pred_grasps_cam[k], np.eye(4), colors=colors3, gripper_openings=gripper_openings_k)    
     mlab.show()
+
+def visualize_grasps_rgb(full_pc, pred_grasps_cam, scores, plot_opencv_cam=False, pc_colors=None, gripper_openings=None,
+                         gripper_width=0.08):
+        """Visualizes colored point cloud and predicted grasps. If given, colors grasps by segmap regions.
+        Thick grasp is most confident per segment. For scene point cloud predictions, colors grasps according to confidence.
+
+        Arguments:
+            full_pc {np.ndarray} -- Nx3 point cloud of the scene
+            pred_grasps_cam {dict[int:np.ndarray]} -- Predicted 4x4 grasp trafos per segment or for whole point cloud
+            scores {dict[int:np.ndarray]} -- Confidence scores for grasps
+
+        Keyword Arguments:
+            plot_opencv_cam {bool} -- plot camera coordinate frame (default: {False})
+            pc_colors {np.ndarray} -- Nx3 point cloud colors (default: {None})
+            gripper_openings {dict[int:np.ndarray]} -- Predicted grasp widths (default: {None})
+            gripper_width {float} -- If gripper_openings is None, plot grasp widths (default: {0.008})
+        """
+
+        print('Visualizing...takes time')
+        cm = plt.get_cmap('rainbow')
+        cm2 = plt.get_cmap('gist_rainbow')
+
+        fig = mlab.figure('Pred Grasps')
+        mlab.view(azimuth=180, elevation=180, distance=0.2)
+        draw_pc_with_colors(full_pc, pc_colors)
+        colors = [cm(1. * i / len(pred_grasps_cam))[:3] for i in range(len(pred_grasps_cam))]
+        colors2 = {k: cm2(0.5 * np.max(scores[k]))[:3] for k in pred_grasps_cam if np.any(pred_grasps_cam[k])}
+
+        if plot_opencv_cam:
+            plot_coordinates(np.zeros(3, ), np.eye(3, 3))
+        for i, k in enumerate(pred_grasps_cam):
+            if np.any(pred_grasps_cam[k]):
+                gripper_openings_k = np.ones(len(pred_grasps_cam[k])) * gripper_width if gripper_openings is None else \
+                gripper_openings[k]
+                if len(pred_grasps_cam) > 1:
+                    draw_grasps(pred_grasps_cam[k], np.eye(4), color=colors[i], gripper_openings=gripper_openings_k)
+                    draw_grasps([pred_grasps_cam[k][np.argmax(scores[k])]], np.eye(4), color=colors2[k],
+                                gripper_openings=[gripper_openings_k[np.argmax(scores[k])]], tube_radius=0.0025)
+                else:
+                    colors3 = [cm2(0.5 * score)[:3] for score in scores[k]]
+                    draw_grasps(pred_grasps_cam[k], np.eye(4), colors=colors3, gripper_openings=gripper_openings_k)
+        mlab.show()
+
 
 def draw_pc_with_colors(pc, pc_colors=None, single_color=(0.3,0.3,0.3), mode='2dsquare', scale_factor=0.0018):
     """

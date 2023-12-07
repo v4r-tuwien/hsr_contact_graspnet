@@ -71,11 +71,20 @@ def inference(global_config, checkpoint_dir, input_paths, K=None, local_regions=
         if segmap is None and (local_regions or filter_grasps):
             raise ValueError('Need segmentation map to extract local regions or filter grasps')
 
+        print('rgb: ', rgb.shape, rgb.dtype)
+        print('depth: ', depth.shape, depth.dtype)
+        print('z range: ', z_range, z_range)
+        print('segmap: ', np.unique(segmap), segmap.shape)
+        print('local regions: ', local_regions)
+        print('cam_K: ', cam_K, cam_K.shape)
         if pc_full is None:
             print('Converting depth to point cloud(s)...')
             pc_full, pc_segments, pc_colors = grasp_estimator.extract_point_clouds(depth, cam_K, segmap=segmap, rgb=rgb,
                                                                                     skip_border_objects=skip_border_objects, z_range=z_range)
 
+        print("pc_full: ", np.unique(pc_full), pc_full.shape)
+        print("pc_segments: ", pc_segments)
+        print("pc_colors: ", np.unique(pc_colors), pc_colors.shape)
         print('Generating Grasps...')
         pred_grasps_cam, scores, contact_pts, _ = grasp_estimator.predict_scene_grasps(sess, pc_full, pc_segments=pc_segments, 
                                                                                           local_regions=local_regions, filter_grasps=filter_grasps, forward_passes=forward_passes)  
@@ -108,9 +117,11 @@ if __name__ == "__main__":
     FLAGS = parser.parse_args()
 
     print('Load global config')
+
+    print('config: ', FLAGS.ckpt_dir, FLAGS.forward_passes)
     global_config = config_utils.load_config(FLAGS.ckpt_dir, batch_size=FLAGS.forward_passes, arg_configs=FLAGS.arg_configs)
     
-    print(str(global_config))
+    print('global_config: ', str(global_config))
     print('pid: %s'%(str(os.getpid())))
 
     print('Start inference')

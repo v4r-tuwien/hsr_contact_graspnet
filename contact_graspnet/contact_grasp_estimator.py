@@ -95,7 +95,8 @@ class GraspEstimator:
         :param sess: tf.Session
         :param saver: tf.train.Saver        
         """
-        
+       
+        print('log_dir: ', log_dir)
         chkpt = tf.train.get_checkpoint_state(log_dir)
         if chkpt and chkpt.model_checkpoint_path:
             print(('loading ',  chkpt.model_checkpoint_path))

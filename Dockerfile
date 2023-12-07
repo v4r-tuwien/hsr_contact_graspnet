@@ -79,8 +79,16 @@ RUN rosdep init && \
 
 RUN apt-get update && apt-get install --no-install-recommends -y --allow-unauthenticated \
      python3-catkin-tools \
+     python3-pip \
+     python3-all-dev \
+     python3-catkin-pkg-module \
+     python3-rospkg-modules \
+     python3-empy \
+     ros-melodic-desktop-full --fix-missing \
      ros-melodic-realsense2-camera \
      && rm -rf /var/lib/apt/lists/*
+
+# tf2_ros import error: https://answers.ros.org/question/326226/importerror-dynamic-module-does-not-define-module-export-function-pyinit__tf2/
 
 RUN python -m pip install --upgrade setuptools opencv-contrib-python
 
