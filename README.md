@@ -1,4 +1,17 @@
-# Contact-GraspNet  
+# Quick Start:
+- Build the container:
+```shell
+  cd docker
+  bash build_container.sh
+```
+- Run container:
+```shell
+  docker-compose -f docker-compose.yml up
+```
+
+- [Download models](#download-models-and-data)
+
+# Original README: Contact-GraspNet  
 
 ### Contact-GraspNet: Efficient 6-DoF Grasp Generation in Cluttered Scenes   
 Martin Sundermeyer, Arsalan Mousavian, Rudolph Triebel, Dieter Fox  
