@@ -78,7 +78,7 @@ class PartNormalDataset():
             print(cat, self.seg_classes[cat])
         
         self.cache = {} # from index to (point_set, cls, seg) tuple
-        self.cache_size = 20000
+        self.cache_size = 1000
         
     def __getitem__(self, index):
         if index in self.cache:

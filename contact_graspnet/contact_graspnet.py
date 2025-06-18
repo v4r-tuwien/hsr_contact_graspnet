@@ -19,7 +19,7 @@ from tf_grouping import query_ball_point, group_point, knn_point
 
 import mesh_utils
 
-def placeholder_inputs(batch_size, num_input_points=20000, input_normals=False):
+def placeholder_inputs(batch_size, num_input_points=1000, input_normals=False):
     """
     Creates placeholders for input pointclouds, scene indices, camera poses and training/eval mode 
 

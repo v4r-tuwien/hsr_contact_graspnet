@@ -3,28 +3,18 @@
 import sys
 
 import rospy
-import message_filters
-#import tf2_ros
 
-import actionlib
-from geometry_msgs.msg import Pose, PoseArray, Quaternion, TransformStamped
-from sensor_msgs.msg import Image, CameraInfo
-from std_msgs.msg import String
-from robokudo_msgs.msg import GenericImgProcAnnotatorResult, GenericImgProcAnnotatorAction
-# from contact_graspnet_node.srv import returnGrasps
+from geometry_msgs.msg import Pose
+from object_detector_msgs.srv import estimate_poses, estimate_posesResponse
 
 import os
 import sys
-import math
 import numpy as np
-import copy
-import json
 import scipy
 
 import tensorflow as tf
 from visualization_msgs.msg import Marker
 
-import ros_numpy
 import cv2
 from cv_bridge import CvBridge, CvBridgeError
 
@@ -101,44 +91,46 @@ def toPix_array(translation, fx, fy, cx, cy):
 
 def run_inference(sess, gcn_model, rgb, depth, cam_K, depth_cut=[0.2, 1.5], skip_border=False, filter_grasps=True, forward_passes=1, bbox=None, mask=None):
 
-    print('Is inference looping?')
+    rospy.loginfo("mask min: {}, max: {}".format(np.min(mask), np.max(mask)) if mask is not None else "No mask provided")
 
-    #image, intrinsics = input_resize(image,
-    #                     [480, 640],
-    #                     [cam_fx, cam_fy, cam_cx, cam_cy])
-    image_raw = copy.deepcopy(rgb)
-    depth = depth*0.001
-    #image = preprocess_image(rgb)
-    #image_mask = copy.deepcopy(image)
-
-    print("image stats: ", np.unique(depth), depth.shape)
-    print("z range: ", depth_cut, depth_cut)
-    print("cam_K: ", cam_K, cam_K.shape)
-
-    #if pc_full is None:
     print('Converting depth to point cloud(s)...')
 
-    if bbox is not None:
-        rospy.loginfo("Using bbox to crop the image")
-        x_min = bbox.x_offset
-        x_max = x_min + bbox.width
-        y_min = bbox.y_offset
-        y_max = y_min + bbox.height
-
-        segmap = np.zeros(depth.shape)
-        segmap[y_min:y_max, x_min:x_max] = 1
-    elif mask is not None:
+    if mask is not None:
         rospy.loginfo("Using mask to crop the image")
-        mask_numpy = ros_numpy.numpify(mask)
-        segmap = np.where(mask_numpy, 1, 0)
+        segmap = np.where(mask, 1, 0)
     else:
-        segmap = np.ones(depth.shape)
+        rospy.logwarn("No mask no service.")
+        return None, None
+
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(6, 6))
+    plt.imshow(segmap * 255, cmap='gray')
+    plt.title('Segmentation Map (segmap)')
+    plt.axis('off')
+    plt.tight_layout()
+    plt.savefig('/root/hsr_contact_graspnet/segmap_debug.png')  # Or any writable path
+    plt.close()
+
+    print("Segmentation map saved to /tmp/segmap_debug.png")
 
     local_regions = True
     pc_full, pc_segments, pc_colors = gcn_model.extract_point_clouds(depth, cam_K, segmap=segmap, rgb=rgb, skip_border_objects=skip_border, z_range=depth_cut)
 
     print("pc_full: ", np.unique(pc_full), pc_full.shape)
-    print("pc_segments: ", pc_segments)
+    print("pc_segments: ", pc_segments[1].shape)
+
+    import open3d as o3d
+    # Convert to Open3D point cloud
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(pc_segments[1])
+
+    # Optionally, set a uniform color (e.g., gray)
+    pcd.paint_uniform_color([0.5, 0.5, 0.5])
+    print(pcd)
+
+    # Save to a PLY file
+    o3d.io.write_point_cloud("/root/hsr_contact_graspnet/output.ply", pcd)
+
     print("pc_colors: ", np.unique(pc_colors), pc_colors.shape)
 
     print('Generating Grasps...')
@@ -147,6 +139,11 @@ def run_inference(sess, gcn_model, rgb, depth, cam_K, depth_cut=[0.2, 1.5], skip
     print("pred_grasp_cam: ", pred_grasps_cam)
     print("scores: ", scores)
     print("contact_pts: ", contact_pts)
+
+    # Check if any grasps were returned
+    if not scores or 1.0 not in scores or len(scores[1.0]) == 0:
+        rospy.logwarn("No grasp scores found at confidence level 1.0.")
+        return None, None
 
     idx = np.argmax(scores[1.0])
 
@@ -160,14 +157,19 @@ class estimateGraspPose:
     def __init__(self, name):
         # ROS params
 
-        camera_topic = "/hsrb/head_rgbd_sensor/depth_registered/camera_info"
-        checkpoint_path = "/root/contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001"
-        pose_estimator_topic = "/pose_estimator/find_grasppose_cg"
-    
+        checkpoint_path = "/root/hsr_contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001"
+        pose_estimator_topic = "/find_graspposes_contact_graspnet"
+        
+        self.intrinsics = np.array(rospy.get_param('/pose_estimator/intrinsics'))
+        rospy.loginfo(f"[{name}] Using intrinsics: {self.intrinsics}")
+
+        self.frame_id = rospy.get_param('/pose_estimator/color_frame_id', 'head_rgbd_sensor_rgb_frame')
+        self.depth_encoding = rospy.get_param('/pose_estimator/depth_encoding', 'mono16')
+        self.depth_scale = rospy.get_param('/pose_estimator/depth_scale', 1000.0)
+        self.gripper_offset = rospy.get_param('/pose_estimator/gripper_offset', 0.015)
+
         # Camera intrinsics
         rospy.loginfo(f"[{name}] Waiting for camera info...")
-        self.camera_info = rospy.wait_for_message(camera_topic, CameraInfo)
-        self.intrinsics = np.array([v for v in self.camera_info.K]).reshape(3, 3)
 
         ##################################
         # Building and loading the model #
@@ -196,29 +198,54 @@ class estimateGraspPose:
         # Load weights
         self.grasp_estimator.load_weights(self.sess, saver, checkpoint_path, mode='test')
 
-        self.server = actionlib.SimpleActionServer(pose_estimator_topic,
-                                                   GenericImgProcAnnotatorAction,
-                                                   execute_cb=self.callback,
-                                                   auto_start=False)
+        self.service = rospy.Service(pose_estimator_topic, estimate_poses, self.estimate_grasp_poses)
+        
         self.marker_pub = rospy.Publisher('/grasping_pipeline/grasp_marker', Marker, queue_size=10)
-        self.server.start()
+
         print("Grasp Pose Estimation with Contact-GraspNet is ready.")
 
-    def callback(self, req):
+    def estimate_grasp_poses(self, req):
         rospy.loginfo("Calling Contact GraspNet")
- 
-        rgb = ros_numpy.numpify(req.rgb)
-        depth = ros_numpy.numpify(req.depth).astype(np.float32)
+        rospy.loginfo(f"{self.intrinsics[0,2]}")
+        detection = req.det
+        rgb = req.rgb
+        depth = req.depth
 
-        bbox = req.bb_detections[0]
-        mask = req.mask_detections[0]
+        width, height = rgb.width, rgb.height
+        assert width == 640 and height == 480
+
+        try:
+            rgb_image = CvBridge().imgmsg_to_cv2(rgb, "bgr8")
+            print()
+        except CvBridgeError as e:
+            print(e)
+
+        try:
+            depth.encoding = self.depth_encoding
+            depth_img = CvBridge().imgmsg_to_cv2(depth, self.depth_encoding)
+            depth_img = depth_img / int(self.depth_scale)
+
+        except CvBridgeError as e:
+            print(e)
+
+        response = estimate_posesResponse()
+        estimates = []
+
+        mask = detection.mask
+        mask = np.zeros((height, width), dtype=np.uint8)
+        mask_ids = np.array(detection.mask)
+        mask[np.unravel_index(mask_ids, (height, width))] = 255
+        mask = mask > 127
+
+        bbox = detection.bbox
+        bbox = [bbox.xmin, bbox.ymin, bbox.xmax, bbox.ymax]
 
         # Run inference
         pred_grasps_cam, idx = run_inference(
             self.sess,
             self.grasp_estimator,
-            rgb,
-            depth,
+            rgb_image,
+            depth_img,
             self.intrinsics,
             self.depth_cut,
             self.skip_border_objects,
@@ -227,7 +254,11 @@ class estimateGraspPose:
             bbox,
             mask)
 
-        response = GenericImgProcAnnotatorResult()
+        # Check for valid predictions
+        if pred_grasps_cam is None or idx is None:
+            rospy.logwarn("No valid grasp predictions to process.")
+            response.poses = estimates
+            return response
 
         for i, pred_grasp in enumerate(pred_grasps_cam):
 
@@ -236,7 +267,7 @@ class estimateGraspPose:
             pred_grasp[:3, :3] = np.dot(current_orientation, scipy.spatial.transform.Rotation.from_euler('z', np.pi/2).as_matrix())
 
             # Move the grasp along its z-axis
-            grasp_translation = [0, 0, 0.015]
+            grasp_translation = [0, 0, self.gripper_offset]
             head_camera_translation = current_orientation.dot(grasp_translation)
             pred_grasp[0, 3] += head_camera_translation[0]
             pred_grasp[1, 3] += head_camera_translation[1]
@@ -245,16 +276,14 @@ class estimateGraspPose:
             pose = self.create_pose(pred_grasp)
             
             if i == idx:
-                #self.add_marker(pose, i, "b")
-                response.pose_results.append(pose)
-                response.class_ids.append(-1)
-            #else:
-                #self.add_marker(pose, i, "r")
+                estimates.append(pose)
 
         rospy.loginfo('marker published')
 
-        self.server.set_succeeded(response)
-
+        response.poses = estimates
+        rospy.loginfo(f"Estimated {estimates}")
+        return response
+    
     def create_pose(self, grasp_pose):
 
         msg = Pose()
@@ -276,7 +305,7 @@ class estimateGraspPose:
     def add_marker(self, pose_msg, id, color):
       
         marker = Marker()
-        marker.header.frame_id = "head_rgbd_sensor_rgb_frame"
+        marker.header.frame_id = self.frame_id
         marker.header.stamp = rospy.Time()
         marker.ns = 'grasp_marker ' + str(id)
         marker.id = 0

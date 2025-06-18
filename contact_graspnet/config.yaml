@@ -47,8 +47,8 @@ DATA:
     sigma: 0.001
     clip: 0.005
     gaussian_kernel: 0
-  raw_num_points: 20000
-  ndataset_points: 20000
+  raw_num_points: 1000 # 500
+  ndataset_points: 1000 # 500
   num_point: 2048
   use_farthest_point: false
   train_and_test: false

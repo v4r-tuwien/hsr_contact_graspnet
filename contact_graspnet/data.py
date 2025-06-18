@@ -432,7 +432,7 @@ class PointCloudReader:
         self,
         root_folder,
         batch_size=1,
-        raw_num_points = 20000,
+        raw_num_points = 1000,
         estimate_normals = False,
         caching=True,
         use_uniform_quaternions=False,

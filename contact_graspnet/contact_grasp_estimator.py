@@ -250,9 +250,12 @@ class GraspEstimator:
         pred_grasps_cam, scores, contact_pts, gripper_openings = {}, {}, {}, {}
 
         # Predict grasps in local regions or full pc
+        
         if local_regions:
             pc_regions, _ = self.extract_3d_cam_boxes(pc_full, pc_segments)
+
             for k, pc_region in pc_regions.items():
+                print('Predicting grasps for object {} with {} points'.format(k, pc_region.shape[0]))
                 pred_grasps_cam[k], scores[k], contact_pts[k], gripper_openings[k] = self.predict_grasps(sess, pc_region, convert_cam_coords=True, forward_passes=forward_passes)
         else:
             pc_full = regularize_pc_point_count(pc_full, self._contact_grasp_cfg['DATA']['raw_num_points'])
@@ -270,6 +273,7 @@ class GraspEstimator:
                     pred_grasps_cam[k] = pred_grasps_cam[j][segment_idcs]
                     scores[k] = scores[j][segment_idcs]
                     contact_pts[k] = contact_pts[j][segment_idcs]
+
                     try:
                         gripper_openings[k] = gripper_openings[j][segment_idcs]
                     except:

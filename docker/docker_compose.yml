@@ -2,8 +2,9 @@ version: '2.4'
 
 services:
 
-  contact_graspnet_final:
+  contact_graspnet:
     image: contact_graspnet_final
+    privileged: true
     build:
       context: .
       dockerfile: Dockerfile
@@ -13,13 +14,16 @@ services:
       - /dev/bus/usb:/dev/bus/usb
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ../:/root/contact_graspnet
+      - ../../config:/root/config
     environment:
+      - ROS_MASTER_URI=${ROS_MASTER_URI:-http://127.0.0.1:11311}
+      - ROS_IP=${ROS_IP:-127.0.0.1}
       - DISPLAY
       - QT_X11_NO_MITSHM=1
-    env_file:
-      - ../config/ros.env
+      - NVIDIA_DRIVER_CAPABILITIES=all
     command: bash -c "source /opt/ros/melodic/setup.bash;
                       source /root/catkin_ws/devel/setup.bash; 
+                      pip install open3d;
                       python3 /root/contact_graspnet/ROS/contact_graspnet_node/scripts/contact_graspnet_script_as.py"
     stdin_open: true
     tty: true 
