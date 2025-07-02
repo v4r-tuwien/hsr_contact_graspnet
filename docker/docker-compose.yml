@@ -2,7 +2,7 @@ version: '2.4'
 
 services:
 
-  contact_graspnet_final:
+  contact_graspnet:
     image: contact_graspnet_final
     build:
       context: .
@@ -12,14 +12,14 @@ services:
     volumes:
       - /dev/bus/usb:/dev/bus/usb
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      - ../:/root/contact_graspnet
+      - ../:/root/hsr_contact_graspnet
     environment:
       - DISPLAY
       - QT_X11_NO_MITSHM=1
     env_file:
       - ../config/ros.env
-    command: bash -c "source /opt/ros/melodic/setup.bash;
+    command: bash -c "source /opt/ros/noetic/setup.bash;
                       source /root/catkin_ws/devel/setup.bash; 
-                      python3 /root/contact_graspnet/ROS/contact_graspnet_node/scripts/contact_graspnet_script_as.py"
+                      python3 /root/hsr_contact_graspnet/ROS/contact_graspnet_node/scripts/contact_graspnet_script_as.py"
     stdin_open: true
     tty: true 

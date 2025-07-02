@@ -42,10 +42,8 @@ print(BASE_DIR)
 #BASE_DIR = "/contact_graspnet/contact_graspnet" # defined in run_container.sh
 sys.path.append(os.path.join(BASE_DIR))
 import config_utils
-from data import regularize_pc_point_count, depth2pc, load_available_input_data
 
 from contact_grasp_estimator import GraspEstimator
-from visualization_utils import visualize_grasps, show_image
 
 ###################################
 ######## Utils funcitons ##########
@@ -161,7 +159,7 @@ class estimateGraspPose:
         # ROS params
 
         camera_topic = "/hsrb/head_rgbd_sensor/depth_registered/camera_info"
-        checkpoint_path = "/root/contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001"
+        checkpoint_path = "/contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001"
         pose_estimator_topic = "/pose_estimator/find_grasppose_cg"
     
         # Camera intrinsics
