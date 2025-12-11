@@ -6,7 +6,7 @@
 ```
 - Run container:
 ```shell
-  docker-compose -f docker-compose.yml up
+  CONFIG=params_sasha.yaml docker compose -f docker_compose.yml up
 ```
 
 - [Download models](#download-models-and-data)

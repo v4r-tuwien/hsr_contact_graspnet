@@ -159,16 +159,15 @@ def run_inference(sess, gcn_model, rgb, depth, cam_K, depth_cut=[0.2, 1.5], skip
 class estimateGraspPose:
     def __init__(self, name):
         # ROS params
-
-        camera_topic = "/hsrb/head_rgbd_sensor/depth_registered/camera_info"
         checkpoint_path = "/root/contact_graspnet/checkpoints/scene_test_2048_bs3_hor_sigma_001"
-        pose_estimator_topic = "/pose_estimator/find_grasppose_cg"
-    
-        # Camera intrinsics
-        rospy.loginfo(f"[{name}] Waiting for camera info...")
-        self.camera_info = rospy.wait_for_message(camera_topic, CameraInfo)
-        self.intrinsics = np.array([v for v in self.camera_info.K]).reshape(3, 3)
+        pose_estimator_topic = "/grasp_estimator/find_grasppose_cg"
 
+        # Camera intrinsics
+        intrinsics = rospy.get_param('/grasp_estimator/intrinsics')
+        self.intrinsics = np.array(intrinsics).reshape(3, 3)
+
+        self.camera_frame = rospy.get_param('/grasp_estimator/color_frame_id')
+        
         ##################################
         # Building and loading the model #
         ##################################
@@ -276,7 +275,7 @@ class estimateGraspPose:
     def add_marker(self, pose_msg, id, color):
       
         marker = Marker()
-        marker.header.frame_id = "head_rgbd_sensor_rgb_frame"
+        marker.header.frame_id = self.camera_frame
         marker.header.stamp = rospy.Time()
         marker.ns = 'grasp_marker ' + str(id)
         marker.id = 0

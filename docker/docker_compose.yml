@@ -10,6 +10,7 @@ services:
     network_mode: "host"
     runtime: "nvidia"
     volumes:
+      - ../config:/root/config
       - /dev/bus/usb:/dev/bus/usb
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       - ../:/root/contact_graspnet
@@ -20,6 +21,7 @@ services:
       - ../config/ros.env
     command: bash -c "source /opt/ros/melodic/setup.bash;
                       source /root/catkin_ws/devel/setup.bash; 
+                      rosparam load /root/config/${CONFIG} /grasp_estimator;
                       python3 /root/contact_graspnet/ROS/contact_graspnet_node/scripts/contact_graspnet_script_as.py"
     stdin_open: true
     tty: true 
